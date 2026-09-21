@@ -283,7 +283,7 @@ tr.done td{color:var(--mu)}
     <div id="incList"></div>
 
     <div class="row" style="justify-content:space-between;margin-top:18px"><h3 style="font-size:.85rem">Utang / Pos Wajib</h3><button class="btn ghost" style="padding:5px 10px;font-size:.72rem" onclick="addDebt()">＋ Tambah</button></div>
-    <p class="mu" style="font-size:.68rem;margin-top:2px">Dibayar berurutan dari atas ke bawah secepat kas tersedia.</p>
+    <p class="mu" style="font-size:.68rem;margin-top:2px">Dibayar berurutan dari atas ke bawah secepat kas tersedia; isi "cicilan" untuk membatasi per gajian. Sisa kas setelah cicilan otomatis masuk tabungan.</p>
     <div id="debtList"></div>
 
     <div class="row" style="margin-top:16px;gap:8px"><button class="btn" style="flex:1" onclick="saveSettings()">Simpan & hitung ulang</button><button class="btn ghost" onclick="defaults();closeSettings()">Default</button></div>
@@ -325,7 +325,7 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v8';
+const KEY='ledgr_v9';
 const DEF={
   start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
   incomes:[
@@ -334,7 +334,7 @@ const DEF={
     {name:'Surplus pasangan (Nov)',amt:50000,every:3,start:'2026-11-01',end:'2026-11-30',cap:300000},
     {name:'Uang project (kemungkinan)',amt:100000,every:0,start:'2026-09-23',end:'',cap:''}
   ],
-  debts:[{name:'Utang kecil',amt:16000},{name:'Perbaikan motor (dicover surplus pasangan)',amt:150000},{name:'Utang',amt:523000}],
+  debts:[{name:'Utang kecil',amt:16000},{name:'Perbaikan motor (dicover surplus pasangan)',amt:150000},{name:'Utang (cicil 181k/gajian)',amt:523000,per:181000}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -376,7 +376,7 @@ function build(){
     const inc=evs.reduce((a,b)=>a+b.amt,0);
     const days=Math.round((wEnd-d)/DAY),spend=Math.round(S.spend*days/7);
     let avail=carry+inc-spend;carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);const pays=[];
-    debts.forEach((db,j)=>{if(avail>0&&db.left>0){const p=Math.min(db.left,avail);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0})}});
+    debts.forEach((db,j)=>{if(avail>0&&db.left>0&&inc>0){const p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0})}});
     const debt=pays.reduce((a,b)=>a+b.amt,0),save=avail;acc+=save;
     const dLeft=debts.reduce((a,b)=>a+b.left,0);
     PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save,dLeft,acc,days,carry});w++;d=wEnd;
@@ -508,6 +508,7 @@ function renderLists(){
     <button class="x" onclick="F.debts.splice(${i},1);renderLists()">✕</button>
     <div><label>Nama</label><input value="${esc(d.name)}" oninput="F.debts[${i}].name=this.value"></div>
     <div><label>Nominal (Rp)</label><input type="number" value="${d.amt}" oninput="F.debts[${i}].amt=+this.value"></div>
+    <div class="full"><label>Maks bayar per gajian / cicilan (opsional, kosong = bayar semaksimal mungkin)</label><input type="number" value="${d.per||''}" placeholder="mis. 181000" oninput="F.debts[${i}].per=+this.value"></div>
   </div>`).join('');
 }
 function addInc(){F.incomes.push({name:'Pemasukan baru',amt:0,every:7,start:F.start,end:'',cap:''});renderLists()}
