@@ -143,7 +143,7 @@ tr.done td{color:var(--mu)}
 
 <div class="top"><div class="in">
   <div class="logo"><i></i>Ledgr</div>
-  <span class="pill">DEBT-FREE SPRINT</span>
+  <span class="pill" style="background:rgba(59,130,246,.15);color:var(--blue);border-color:rgba(59,130,246,.3)">DEBT-FREE PLAN</span>
   <div class="sp"></div>
   <button class="ic" title="Pengaturan" onclick="openSettings()">⚙</button>
 </div></div>
@@ -249,7 +249,7 @@ tr.done td{color:var(--mu)}
     <div class="step"><div class="n" style="background:rgba(244,63,94,.15);color:var(--red)">3</div><h3>Fase Tahan (Belanja)</h3>
       <p id="s3"></p>
       <div class="daily" id="dailyGrid"></div>
-      <ul><li>Food prep Senin: <b>beras 2 kg + telur ½ kg + bumbu sachet</b>.</li><li>Makan 2× sehari, air putih, tidur lebih awal.</li><li><b>Nol</b> rokok · kopi · kuota tambahan · ojol · nongkrong.</li></ul></div>
+      <ul><li>Belanja dapur Senin ±<b>60k</b>: beras 2 kg, telur 1 kg, tempe/tahu, sayur, bumbu, minyak.</li><li>Sisa ±<b>40k</b> = kuota, bensin motor, 1–2× jajan ringan. Masak 3× sehari, bawa bekal kerja.</li><li>Tetap <b>nol</b> untuk: rokok, nongkrong rutin, top-up game, cicilan baru.</li></ul></div>
   </div>
 </section>
 
@@ -315,9 +315,9 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v7';
+const KEY='ledgr_v8';
 const DEF={
-  start:'2026-09-22',end:'2026-11-10',spend:40000,target:1000000,payday:1,
+  start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
   incomes:[
     {name:'Gaji harian (dibayar Senin)',amt:50000,every:7,start:'2026-09-28',end:'',cap:'',daily:true},
     {name:'Surplus pasangan (Okt)',amt:50000,every:3,start:'2026-10-01',end:'2026-10-31',cap:300000},
@@ -447,7 +447,7 @@ function render(){
   const dw=PLAN.filter(p=>p.debt>0).length;
   $('s1').textContent=`Mulai kerja ${dstr(T.start)}; gajian pertama ${PLAN.find(p=>p.inc)?dstr(PLAN.find(p=>p.inc).evs[0].date):'-'}. Semua uang masuk setelah jatah belanja dilempar ke utang. ${fmt(T.debtTotal)} lunas dalam ${dw} minggu${T.freeDate?` — tanggal ${dstr(T.freeDate)}`:''}.`;
   $('s2').textContent=`Setelah lunas, setiap rupiah yang masuk (gaji + surplus) langsung disetor. ${PLAN.length-dw} minggu setoran → ${fmt(T.save)}.`;
-  $('s3').textContent=`Amplop belanja ${fmt(S.spend)}/minggu = ${fmt(S.spend/7)}/hari. Surplus pasangan BUKAN uang jajan — masuk pool yang sama.`;
+  $('s3').textContent=`Amplop belanja ${fmt(S.spend)}/minggu ≈ ${fmt(S.spend/7)}/hari — cukup makan layak 3× + kuota + bensin, tanpa gaya hidup. Surplus pasangan tetap masuk pool, bukan uang jajan.`;
   const per=Math.floor(S.spend/7/500)*500,rest=S.spend-per*7;
   $('dailyGrid').innerHTML=ID.slice(1).concat(ID[0]).map((d,i)=>`<div>${d}<b>${fmtK(per+(i===6?rest:0))}</b></div>`).join('');
 
