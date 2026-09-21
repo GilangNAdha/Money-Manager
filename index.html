@@ -300,6 +300,7 @@ tr.done td{color:var(--mu)}
       <div class="field"><label>Deadline</label><input id="fEnd" type="date"></div>
       <div class="field"><label>Belanja / minggu (Rp)</label><input id="fSpend" type="number"></div>
       <div class="field"><label>Target tabungan (Rp)</label><input id="fTarget" type="number"></div>
+      <div class="field"><label>Belanja minggu pertama (Rp, opsional)</label><input id="fSpend1" type="number" placeholder="kosong = proporsional"></div>
       <div class="field"><label>Hari gajian / awal minggu</label><select id="fPayday" style="width:100%;background:#0a0b0f;border:1px solid var(--line);color:var(--tx);padding:10px 12px;border-radius:10px;font-size:.95rem"><option value="1">Senin</option><option value="2">Selasa</option><option value="3">Rabu</option><option value="4">Kamis</option><option value="5">Jumat</option><option value="6">Sabtu</option><option value="0">Minggu</option></select></div>
     </div>
 
@@ -351,16 +352,16 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v15';
+const KEY='ledgr_v16';
 const DEF={
-  start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
+  start:'2026-09-22',end:'2026-11-10',spend:100000,spend1:40000,target:1000000,payday:1,
   incomes:[
     {name:'Gaji harian (dibayar Senin)',amt:50000,every:7,start:'2026-09-28',end:'',cap:'',daily:true},
     {name:'Surplus pasangan (Okt)',amt:50000,every:3,start:'2026-10-01',end:'2026-10-31',cap:300000},
     {name:'Surplus pasangan (Nov)',amt:50000,every:3,start:'2026-11-01',end:'2026-11-30',cap:300000},
     {name:'Uang project (kemungkinan)',amt:100000,every:0,start:'2026-09-23',end:'',cap:''}
   ],
-  debts:[{name:'Perbaikan motor',amt:150000,due:'2026-09-24',note:'Diganti dari surplus pasangan Okt'},{name:'Utang kecil',amt:16000,due:'2026-09-23',note:'Bayar Rabu dari uang project'},{name:'Utang utama',amt:523000,per:181000,fixed:true,note:'3 fase: 181k · 181k · 161k'}],
+  debts:[{name:'Motor — DP bengkel',amt:44000,due:'2026-09-24',note:'Dari sisa uang project'},{name:'Motor — pelunasan bengkel',amt:106000,due:'2026-09-28',note:'Dari gajian 28 Sep, diganti surplus Okt'},{name:'Utang kecil',amt:16000,due:'2026-09-23',note:'Bayar Rabu dari uang project'},{name:'Utang utama',amt:523000,per:181000,fixed:true,note:'3 fase: 181k · 181k · 161k'}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -400,7 +401,7 @@ function build(){
     const wEnd=new Date(Math.min(nb.getTime(),end.getTime()+DAY));
     const evs=ev.filter(e=>e.date>=d&&e.date<wEnd);
     const inc=evs.reduce((a,b)=>a+b.amt,0);
-    const days=Math.round((wEnd-d)/DAY),spend=Math.round(S.spend*days/7);
+    const days=Math.round((wEnd-d)/DAY),spend=(w===1&&+S.spend1>0)?+S.spend1:Math.round(S.spend*days/7);
     const pays=[];let reserved=0;
     // 1) utang dengan sumber dana khusus: dibayar langsung dari pemasukan sumber itu
     debts.forEach((db,j)=>{if(db.src===''||db.src==null||!(db.left>0))return;
@@ -575,11 +576,11 @@ function renderLists(){
 }
 function addInc(){F.incomes.push({name:'Pemasukan baru',amt:0,every:7,start:F.start,end:'',cap:''});renderLists()}
 function addDebt(){F.debts.push({name:'Utang baru',amt:0});renderLists()}
-function openSettings(){F=JSON.parse(JSON.stringify({start:S.start,end:S.end,spend:S.spend,target:S.target,payday:S.payday,incomes:S.incomes,debts:S.debts}));$('fPayday').value=S.payday;
-  $('fStart').value=F.start;$('fEnd').value=F.end;$('fSpend').value=F.spend;$('fTarget').value=F.target;renderLists();$('drawer').classList.add('open')}
+function openSettings(){F=JSON.parse(JSON.stringify({start:S.start,end:S.end,spend:S.spend,spend1:S.spend1,target:S.target,payday:S.payday,incomes:S.incomes,debts:S.debts}));$('fPayday').value=S.payday;
+  $('fStart').value=F.start;$('fEnd').value=F.end;$('fSpend').value=F.spend;$('fTarget').value=F.target;$('fSpend1').value=F.spend1||'';renderLists();$('drawer').classList.add('open')}
 function closeSettings(){$('drawer').classList.remove('open')}
 function saveSettings(){
-  F.start=$('fStart').value;F.end=$('fEnd').value;F.spend=+$('fSpend').value||0;F.target=+$('fTarget').value||0;F.payday=+$('fPayday').value;
+  F.start=$('fStart').value;F.end=$('fEnd').value;F.spend=+$('fSpend').value||0;F.target=+$('fTarget').value||0;F.spend1=+$('fSpend1').value||0;F.payday=+$('fPayday').value;
   if(!F.start||!F.end||P(F.end)<P(F.start))return toast('Tanggal tidak valid');
   Object.assign(S,F);persist();build();closeSettings();toast('Rencana dihitung ulang')}
 function resetAll(){if(confirm('Hapus semua centang & catatan?')){S.done={};S.logs=[];persist();render()}}
