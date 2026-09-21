@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Money Manager — Mode Brutal 1 Juta</title>
+<style>
+  :root{
+    --bg:#0d0e12; --card:#16181f; --card2:#1d2029; --border:#252833;
+    --text:#e6e8ef; --muted:#8a90a3;
+    --blue:#3b82f6; --green:#22c55e; --yellow:#eab308; --red:#ef4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.45;padding:16px;max-width:960px;margin:0 auto}
+  h1{font-size:1.35rem;font-weight:800;letter-spacing:-.01em}
+  h2{font-size:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:26px 0 12px}
+  .sub{color:var(--muted);font-size:.85rem;margin-top:4px}
+  .badge{display:inline-block;background:var(--red);color:#fff;font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:999px;margin-left:6px;vertical-align:middle}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .metric{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 12px}
+  .metric .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .metric .v{font-size:1.15rem;font-weight:800;margin-top:6px}
+  .metric .s{font-size:.72rem;color:var(--muted);margin-top:2px}
+  .c-blue{color:var(--blue)} .c-green{color:var(--green)} .c-yellow{color:var(--yellow)} .c-red{color:var(--red)}
+  .bar{height:14px;background:#0a0b0f;border-radius:999px;overflow:hidden;display:flex;margin-top:10px;border:1px solid var(--border)}
+  .bar span{height:100%;transition:width .4s ease}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:.78rem;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .grid{display:grid;grid-template-columns:1fr;gap:10px}
+  @media(min-width:600px){.grid{grid-template-columns:1fr 1fr}}
+  .item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+  .item .info{flex:1;min-width:0}
+  .item .t{font-weight:700;font-size:.95rem}
+  .item .d{font-size:.75rem;color:var(--muted)}
+  .item .amt{font-weight:800;white-space:nowrap}
+  .clickable{cursor:pointer;user-select:none;transition:transform .08s,border-color .2s,background .2s}
+  .clickable:active{transform:scale(.98)}
+  .clickable:hover{border-color:var(--blue)}
+  .chk{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .item.done{background:rgba(34,197,94,.08);border-color:var(--green)}
+  .item.done .chk{background:var(--green);border-color:var(--green);color:#052e16}
+  .item.done .t{text-decoration:line-through;color:var(--muted)}
+  .pay-icon{width:38px;height:38px;border-radius:10px;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  table{width:100%;border-collapse:collapse;font-size:.8rem}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+  th{color:var(--muted);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em}
+  tr.done td{color:var(--muted)}
+  tr.done td:first-child::before{content:"✓ ";color:var(--green)}
+  tr.today{background:rgba(234,179,8,.08)}
+  .tablewrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border);background:var(--card)}
+  .daily{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
+  .daily div{background:var(--card2);border-radius:8px;padding:8px 4px;text-align:center;font-size:.72rem}
+  .daily b{display:block;font-size:.85rem;color:var(--yellow)}
+  ul.rules{list-style:none;display:grid;gap:8px}
+  ul.rules li{background:var(--card2);border-radius:10px;padding:10px 12px;font-size:.85rem;border-left:3px solid var(--yellow)}
+  ul.rules li b{color:var(--yellow)}
+  .footer{margin:28px 0 10px;text-align:center;font-size:.72rem;color:var(--muted)}
+  .btn{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:.72rem;cursor:pointer}
+  .btn:hover{color:var(--red);border-color:var(--red)}
+  .status{margin-top:12px;font-size:.85rem;padding:10px 12px;border-radius:10px;background:var(--card2)}
+  .tabs{display:flex;gap:6px;margin-top:16px;background:var(--card);padding:4px;border-radius:12px;border:1px solid var(--border)}
+  .tabs button{flex:1;background:transparent;color:var(--muted);border:0;padding:9px;border-radius:9px;font-weight:700;font-size:.8rem;cursor:pointer}
+  .tabs button.active{background:var(--blue);color:#fff}
+  .pane{display:none}.pane.active{display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💸 Money Manager <span class="badge">MODE BRUTAL</span></h1>
+  <p class="sub">21 Sep → 31 Okt 2026 · 41 hari · Target: utang lunas + tabungan <b class="c-green">Rp1.040.000</b></p>
+</header>
+
+<!-- TOP METRICS -->
+<div class="metrics">
+  <div class="metric">
+    <div class="l">Total Pos Wajib</div>
+    <div class="v c-yellow" id="mWajib">Rp0</div>
+    <div class="s" id="mWajibSub">terbayar Rp0</div>
+  </div>
+  <div class="metric">
+    <div class="l">Target Tabungan</div>
+    <div class="v c-green" id="mTarget">Rp0</div>
+    <div class="s" id="mTargetSub">0% terkumpul</div>
+  </div>
+  <div class="metric">
+    <div class="l">Progress Utang</div>
+    <div class="v c-blue" id="mProg">0%</div>
+    <div class="s" id="mProgSub">0 dari 0 item</div>
+  </div>
+</div>
+
+<!-- PROGRESS ALLOCATION -->
+<div class="card" style="margin-top:12px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <b>Alokasi Total Pemasukan</b>
+    <span class="sub" id="totalIncome">Rp0</span>
+  </div>
+  <div class="bar">
+    <span id="barDebt" style="background:var(--yellow)"></span>
+    <span id="barSpend" style="background:var(--red)"></span>
+    <span id="barSave" style="background:var(--green)"></span>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--yellow)"></i>Utang <b id="pctDebt">0%</b></span>
+    <span><i style="background:var(--red)"></i>Belanja Hidup <b id="pctSpend">0%</b></span>
+    <span><i style="background:var(--green)"></i>Tabungan <b id="pctSave">0%</b></span>
+  </div>
+  <div class="status" id="statusMsg"></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="active" data-tab="dash">Dashboard</button>
+  <button data-tab="timeline">Timeline</button>
+  <button data-tab="strategi">Strategi</button>
+</div>
+
+<!-- DASHBOARD PANE -->
+<section class="pane active" id="pane-dash">
+  <h2>💰 Pemasukan (Gajian Senin) — klik saat sudah cair</h2>
+  <div class="grid" id="incomeGrid"></div>
+
+  <h2>📌 Pos Wajib & Utang — klik untuk centang</h2>
+  <div class="grid" id="wajibGrid"></div>
+
+  <h2>🏦 Setoran Tabungan — klik saat sudah disetor</h2>
+  <div class="grid" id="saveGrid"></div>
+</section>
+
+<!-- TIMELINE PANE -->
+<section class="pane" id="pane-timeline">
+  <h2>📅 Tabel Eksekusi Gajian Mingguan</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Mgg</th><th>Gajian</th><th>Masuk</th><th>Bayar Utang</th><th>Belanja</th><th>Tabung</th><th>Sisa Utang</th><th>Total Tabungan</th></tr></thead>
+      <tbody id="timelineBody"></tbody>
+    </table>
+  </div>
+  <p class="sub" style="margin-top:10px">Aturan: setiap Senin uang gajian langsung dipecah 3 amplop di menit pertama — Utang / Tabungan / Belanja. Tidak ada uang "ngambang".</p>
+</section>
+
+<!-- STRATEGI PANE -->
+<section class="pane" id="pane-strategi">
+  <h2>🔥 Amplop Belanja Harian (Rp40.000 / minggu)</h2>
+  <div class="card">
+    <p class="sub">Rp40.000 dibagi 7 hari ≈ <b class="c-yellow">Rp5.700/hari</b>. Ini bukan jajan — ini bertahan hidup. Rekomendasi pembagian:</p>
+    <div class="daily">
+      <div>Sen<b>5k</b></div><div>Sel<b>5k</b></div><div>Rab<b>6k</b></div><div>Kam<b>5k</b></div><div>Jum<b>6k</b></div><div>Sab<b>6k</b></div><div>Min<b>7k</b></div>
+    </div>
+  </div>
+
+  <h2>🍚 Food Prep Mingguan (Belanja Senin, total ≤ Rp40.000)</h2>
+  <div class="card">
+    <ul class="rules">
+      <li><b>Beras 2 kg</b> ≈ Rp24.000 → ±14 porsi nasi (2×/hari cukup)</li>
+      <li><b>Telur ½ kg (±8 butir)</b> ≈ Rp14.000 → lauk 8 kali</li>
+      <li><b>Bumbu/garam/kecap/minyak</b> ≈ Rp2.000 (beli sachet)</li>
+      <li>Tambahan: tempe/tahu Rp5.000 atau mie 2 bungkus → hanya jika ada sisa amplop. Air minum = masak/isi ulang galon patungan.</li>
+    </ul>
+  </div>
+
+  <h2>⚔️ Aturan Brutal (Wajib Ditaati)</h2>
+  <div class="card">
+    <ul class="rules">
+      <li><b>#1 Bayar utang dulu, makan belakangan.</b> Minggu 1 & 2 seluruh sisa gaji setelah Rp40k dipakai untuk utang. Lunas 28 Sep.</li>
+      <li><b>#2 Tabungan = dipindah, bukan disisakan.</b> Setiap Senin setor Rp260.000 ke rekening/celengan terpisah yang SULIT dicairkan. Hapus m-banking-nya kalau perlu.</li>
+      <li><b>#3 Nol pengeluaran non-makanan.</b> Tidak ada kopi, rokok, kuota tambahan, top-up game, nongkrong, ojol. Jalan kaki/nebeng. Wifi gratis.</li>
+      <li><b>#4 Tidak ada "sekali saja".</b> Satu pelanggaran Rp20.000 = 3,5 hari makan hilang. Tidak ada toleransi.</li>
+      <li><b>#5 Makan 2× sehari.</b> Sarapan digeser ke jam 10, makan malam jam 6. Lapar malam → minum air putih, tidur lebih awal.</li>
+      <li><b>#6 Cari pemasukan sampingan.</b> Setiap Rp1 tambahan (lembur, jual barang bekas, bantu tetangga) 100% masuk tabungan, BUKAN buat jajan.</li>
+      <li><b>#7 Cek dashboard ini setiap malam.</b> Centang item saat selesai. Kalau belanja minggu ini lewat Rp40k, potong minggu depan.</li>
+    </ul>
+  </div>
+
+  <h2>📊 Ringkasan Angka</h2>
+  <div class="card">
+    <table>
+      <tr><td>Total pemasukan (6 gajian × Rp300.000)</td><td class="c-blue"><b>Rp1.800.000</b></td></tr>
+      <tr><td>Bayar utang</td><td class="c-yellow"><b>− Rp523.000</b></td></tr>
+      <tr><td>Belanja hidup 41 hari (≈ Rp5.700/hari)</td><td class="c-red"><b>− Rp237.000</b></td></tr>
+      <tr><td><b>Tabungan bersih 31 Okt 2026</b></td><td class="c-green"><b>Rp1.040.000</b></td></tr>
+    </table>
+  </div>
+</section>
+
+<p class="footer">Progress tersimpan otomatis di browser ini · <button class="btn" onclick="resetAll()">Reset centang</button></p>
+
+<script>
+/* ================== DATA ================== */
+const START = new Date(2026,8,21), END = new Date(2026,9,31), TODAY = new Date();
+const fmt = n => 'Rp' + n.toLocaleString('id-ID');
+
+const INCOME = [
+  {id:'g1', t:'Gajian Minggu 1', d:'Senin, 21 Sep 2026', amt:300000},
+  {id:'g2', t:'Gajian Minggu 2', d:'Senin, 28 Sep 2026', amt:300000},
+  {id:'g3', t:'Gajian Minggu 3', d:'Senin, 5 Okt 2026',  amt:300000},
+  {id:'g4', t:'Gajian Minggu 4', d:'Senin, 12 Okt 2026', amt:300000},
+  {id:'g5', t:'Gajian Minggu 5', d:'Senin, 19 Okt 2026', amt:300000},
+  {id:'g6', t:'Gajian Minggu 6', d:'Senin, 26 Okt 2026', amt:300000},
+];
+const WAJIB = [
+  {id:'u1', t:'Utang — Cicilan 1', d:'Bayar Senin 21 Sep · langsung setelah gajian', amt:260000},
+  {id:'u2', t:'Utang — Pelunasan (LUNAS)', d:'Bayar Senin 28 Sep · utang 0', amt:263000},
+];
+const SAVE = [
+  {id:'s1', t:'Setor Tabungan 1', d:'Senin, 5 Okt',  amt:260000},
+  {id:'s2', t:'Setor Tabungan 2', d:'Senin, 12 Okt', amt:260000},
+  {id:'s3', t:'Setor Tabungan 3', d:'Senin, 19 Okt', amt:260000},
+  {id:'s4', t:'Setor Tabungan 4', d:'Senin, 26 Okt', amt:260000},
+];
+const TIMELINE = [
+  {w:1, date:'21 Sep', inc:300000, debt:260000, spend:40000, save:0,      dLeft:263000, sTot:0,       start:new Date(2026,8,21)},
+  {w:2, date:'28 Sep', inc:300000, debt:263000, spend:37000, save:0,      dLeft:0,      sTot:0,       start:new Date(2026,8,28)},
+  {w:3, date:'5 Okt',  inc:300000, debt:0,      spend:40000, save:260000, dLeft:0,      sTot:260000,  start:new Date(2026,9,5)},
+  {w:4, date:'12 Okt', inc:300000, debt:0,      spend:40000, save:260000, dLeft:0,      sTot:520000,  start:new Date(2026,9,12)},
+  {w:5, date:'19 Okt', inc:300000, debt:0,      spend:40000, save:260000, dLeft:0,      sTot:780000,  start:new Date(2026,9,19)},
+  {w:6, date:'26 Okt', inc:300000, debt:0,      spend:40000, save:260000, dLeft:0,      sTot:1040000, start:new Date(2026,9,26)},
+];
+const TOTAL_INC = INCOME.reduce((a,b)=>a+b.amt,0);
+const TOTAL_DEBT = WAJIB.reduce((a,b)=>a+b.amt,0);
+const TOTAL_SAVE = SAVE.reduce((a,b)=>a+b.amt,0);
+const TOTAL_SPEND = TOTAL_INC - TOTAL_DEBT - TOTAL_SAVE;
+
+/* ================== STATE ================== */
+const KEY = 'mm_brutal_v1';
+let state = JSON.parse(localStorage.getItem(KEY) || '{}');
+const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+function toggle(id){ state[id] = !state[id]; save(); render(); }
+function resetAll(){ if(confirm('Hapus semua centang?')){ state={}; save(); render(); } }
+
+/* ================== RENDER ================== */
+function itemHTML(it, icon){
+  return `<div class="item clickable ${state[it.id]?'done':''}" onclick="toggle('${it.id}')">
+    <div class="chk">${state[it.id]?'✓':''}</div>
+    <div class="info"><div class="t">${it.t}</div><div class="d">${it.d}</div></div>
+    <div class="amt">${fmt(it.amt)}</div>
+  </div>`;
+}
+function render(){
+  document.getElementById('incomeGrid').innerHTML = INCOME.map(itemHTML).join('');
+  document.getElementById('wajibGrid').innerHTML  = WAJIB.map(itemHTML).join('');
+  document.getElementById('saveGrid').innerHTML   = SAVE.map(itemHTML).join('');
+
+  const paidDebt = WAJIB.filter(i=>state[i.id]).reduce((a,b)=>a+b.amt,0);
+  const paidCnt  = WAJIB.filter(i=>state[i.id]).length;
+  const saved    = SAVE.filter(i=>state[i.id]).reduce((a,b)=>a+b.amt,0);
+  const pDebt = Math.round(paidDebt/TOTAL_DEBT*100);
+
+  document.getElementById('mWajib').textContent = fmt(TOTAL_DEBT);
+  document.getElementById('mWajibSub').textContent = 'terbayar ' + fmt(paidDebt);
+  document.getElementById('mTarget').textContent = fmt(TOTAL_SAVE);
+  document.getElementById('mTargetSub').textContent = Math.round(saved/TOTAL_SAVE*100) + '% terkumpul (' + fmt(saved) + ')';
+  const mp = document.getElementById('mProg');
+  mp.textContent = pDebt + '%';
+  mp.className = 'v ' + (pDebt===100 ? 'c-green' : 'c-blue');
+  document.getElementById('mProgSub').textContent = pDebt===100 ? '🎉 BEBAS UTANG' : `${paidCnt} dari ${WAJIB.length} item`;
+
+  document.getElementById('totalIncome').textContent = fmt(TOTAL_INC);
+  const pd = TOTAL_DEBT/TOTAL_INC*100, ps = TOTAL_SPEND/TOTAL_INC*100, pv = TOTAL_SAVE/TOTAL_INC*100;
+  document.getElementById('barDebt').style.width = pd+'%';
+  document.getElementById('barSpend').style.width = ps+'%';
+  document.getElementById('barSave').style.width = pv+'%';
+  document.getElementById('pctDebt').textContent = pd.toFixed(1)+'% ('+fmt(TOTAL_DEBT)+')';
+  document.getElementById('pctSpend').textContent = ps.toFixed(1)+'% ('+fmt(TOTAL_SPEND)+')';
+  document.getElementById('pctSave').textContent = pv.toFixed(1)+'% ('+fmt(TOTAL_SAVE)+')';
+
+  // status
+  const daysLeft = Math.max(0, Math.ceil((END - TODAY)/86400000));
+  const dayNo = Math.min(41, Math.max(1, Math.floor((TODAY - START)/86400000)+1));
+  let msg = `📆 Hari ke-${dayNo} dari 41 · sisa <b>${daysLeft} hari</b> menuju 31 Okt. `;
+  msg += pDebt===100
+    ? `Utang lunas. Fokus setor tabungan: <b class="c-green">${fmt(TOTAL_SAVE-saved)}</b> lagi.`
+    : `Sisa utang: <b class="c-yellow">${fmt(TOTAL_DEBT-paidDebt)}</b>. Jatah belanja hari ini: <b class="c-red">Rp5.700</b>.`;
+  document.getElementById('statusMsg').innerHTML = msg;
+
+  // timeline
+  document.getElementById('timelineBody').innerHTML = TIMELINE.map(r=>{
+    const done = state['g'+r.w];
+    const isNow = TODAY >= r.start && TODAY < new Date(r.start.getTime()+7*86400000);
+    return `<tr class="${done?'done':''} ${isNow?'today':''}">
+      <td>${r.w}</td><td>${r.date}</td><td class="c-blue">${fmt(r.inc)}</td>
+      <td class="c-yellow">${r.debt?fmt(r.debt):'—'}</td><td class="c-red">${fmt(r.spend)}</td>
+      <td class="c-green">${r.save?fmt(r.save):'—'}</td>
+      <td>${r.dLeft?fmt(r.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(r.sTot)}</b></td></tr>`;
+  }).join('');
+}
+
+/* tabs */
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); document.getElementById('pane-'+b.dataset.tab).classList.add('active');
+});
+render();
+</script>
+</body>
+</html>
