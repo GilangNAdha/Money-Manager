@@ -259,19 +259,38 @@ tr.done td{color:var(--mu)}
 <!-- SETTINGS -->
 <div class="drawer" id="drawer" onclick="if(event.target===this)closeSettings()">
   <div class="sheet">
-    <div class="row" style="justify-content:space-between"><h3>Parameter Rencana</h3><button class="ic" onclick="closeSettings()">✕</button></div>
+    <div class="row" style="justify-content:space-between"><h3>Kustomisasi Rencana</h3><button class="ic" onclick="closeSettings()">✕</button></div>
     <div class="f2">
-      <div class="field"><label>Gaji per minggu (Rp)</label><input id="fInc" type="number"></div>
-      <div class="field"><label>Total utang (Rp)</label><input id="fDebt" type="number"></div>
+      <div class="field"><label>Mulai periode</label><input id="fStart" type="date"></div>
+      <div class="field"><label>Deadline</label><input id="fEnd" type="date"></div>
       <div class="field"><label>Belanja / minggu (Rp)</label><input id="fSpend" type="number"></div>
       <div class="field"><label>Target tabungan (Rp)</label><input id="fTarget" type="number"></div>
-      <div class="field"><label>Mulai (gajian pertama)</label><input id="fStart" type="date"></div>
-      <div class="field"><label>Deadline</label><input id="fEnd" type="date"></div>
     </div>
-    <p class="mu" style="font-size:.72rem;margin-top:10px">Rencana dihitung ulang otomatis: setiap Senin gaji dikurangi jatah belanja → sisa ke utang dulu, setelah lunas seluruhnya ke tabungan.</p>
-    <div class="row" style="margin-top:14px;gap:8px"><button class="btn" style="flex:1" onclick="saveSettings()">Simpan & hitung ulang</button><button class="btn ghost" onclick="defaults();closeSettings()">Default</button></div>
+
+    <div class="row" style="justify-content:space-between;margin-top:18px"><h3 style="font-size:.85rem">Sumber Pemasukan</h3><button class="btn ghost" style="padding:5px 10px;font-size:.72rem" onclick="addInc()">＋ Tambah</button></div>
+    <p class="mu" style="font-size:.68rem;margin-top:2px">"Setiap N hari" = 7 untuk gajian mingguan, 3 untuk jatah surplus, 0 untuk sekali saja. "Maks total" membatasi jumlah yang bisa diambil (kosongkan jika tanpa batas).</p>
+    <div id="incList"></div>
+
+    <div class="row" style="justify-content:space-between;margin-top:18px"><h3 style="font-size:.85rem">Utang / Pos Wajib</h3><button class="btn ghost" style="padding:5px 10px;font-size:.72rem" onclick="addDebt()">＋ Tambah</button></div>
+    <p class="mu" style="font-size:.68rem;margin-top:2px">Dibayar berurutan dari atas ke bawah secepat kas tersedia.</p>
+    <div id="debtList"></div>
+
+    <div class="row" style="margin-top:16px;gap:8px"><button class="btn" style="flex:1" onclick="saveSettings()">Simpan & hitung ulang</button><button class="btn ghost" onclick="defaults();closeSettings()">Default</button></div>
   </div>
 </div>
+<style>
+.li{background:var(--card2);border-radius:10px;padding:10px;margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;position:relative}
+.li input{width:100%;background:#0a0b0f;border:1px solid var(--line);color:var(--tx);padding:8px 10px;border-radius:8px;font-size:.82rem;outline:none}
+.li input:focus{border-color:var(--blue)}
+.li label{font-size:.62rem;color:var(--mu);display:block;margin-bottom:3px}
+.li .full{grid-column:1/-1}
+.li .x{position:absolute;top:6px;right:6px;background:none;border:0;color:var(--mu);font-size:.9rem}
+.li .x:hover{color:var(--red)}
+.sheet{max-height:92vh;overflow:auto}
+.src{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.src span{font-size:.68rem;padding:4px 8px;border-radius:6px;background:var(--card2);color:var(--mu)}
+.src b{color:var(--tx)}
+</style>
 
 <div class="nav"><div class="in">
   <a href="#overview" class="active"><span>▦</span>Ringkasan</a>
@@ -287,39 +306,71 @@ const $=id=>document.getElementById(id);
 const fmt=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
 const fmtK=n=>n>=1e6?(n/1e6).toFixed(2).replace(/\.?0+$/,'')+'jt':Math.round(n/1e3)+'k';
 const DAY=86400000, ID=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+const P=s=>new Date(s+'T00:00:00');
 const dstr=d=>d.toLocaleDateString('id-ID',{day:'numeric',month:'short'});
 const dlong=d=>d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-const iso=d=>d.toISOString().slice(0,10);
+const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
 const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v2';
-const DEF={inc:300000,debt:523000,spend:40000,target:1000000,start:'2026-09-21',end:'2026-10-31',done:{},logs:[]};
-let S=Object.assign({},DEF,JSON.parse(localStorage.getItem(KEY)||'{}'));
+const KEY='ledgr_v3';
+const DEF={
+  start:'2026-09-28',end:'2026-10-31',spend:40000,target:1000000,
+  incomes:[
+    {name:'Gaji mingguan (Senin)',amt:300000,every:7,start:'2026-09-28',end:'',cap:''},
+    {name:'Surplus pasangan',amt:50000,every:3,start:'2026-10-01',end:'2026-10-31',cap:300000}
+  ],
+  debts:[{name:'Utang',amt:523000}],
+  done:{},logs:[]
+};
+let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
 const persist=()=>localStorage.setItem(KEY,JSON.stringify(S));
 function defaults(){S=JSON.parse(JSON.stringify(DEF));persist();build();}
 
 /* ---------- plan engine ---------- */
 let PLAN=[],T={};
+function incomeEvents(){
+  const ev=[],ps=P(S.start),pe=P(S.end);
+  S.incomes.forEach((inc,i)=>{
+    if(!inc.amt||!inc.start)return;
+    const st=P(inc.start),en=inc.end?P(inc.end):pe,cap=+inc.cap||Infinity;let tot=0;
+    for(let d=new Date(st);d<=en&&d<=pe;d=new Date(d.getTime()+(inc.every>0?inc.every:1e9)*DAY)){
+      if(tot>=cap)break;
+      const a=Math.min(inc.amt,cap-tot);tot+=a;
+      if(d>=ps)ev.push({date:new Date(d),amt:a,name:inc.name,src:i});
+      if(!(inc.every>0))break;
+    }
+  });
+  return ev.sort((a,b)=>a.date-b.date);
+}
 function build(){
-  const start=new Date(S.start+'T00:00:00'),end=new Date(S.end+'T00:00:00');
-  PLAN=[];let debt=S.debt,acc=0,w=1;
+  const start=P(S.start),end=P(S.end),ev=incomeEvents();
+  const debts=S.debts.map(d=>({...d,left:+d.amt||0}));
+  PLAN=[];let acc=0,w=1;
   for(let d=new Date(start);d<=end;d=new Date(d.getTime()+7*DAY)){
-    const avail=Math.max(0,S.inc-S.spend);
-    const pay=Math.min(debt,avail);debt-=pay;
-    const save=avail-pay;acc+=save;
-    PLAN.push({w,date:new Date(d),inc:S.inc,debt:pay,spend:S.spend,save,dLeft:debt,acc});w++;
+    const wEnd=new Date(Math.min(d.getTime()+7*DAY,end.getTime()+DAY));
+    const evs=ev.filter(e=>e.date>=d&&e.date<wEnd);
+    const inc=evs.reduce((a,b)=>a+b.amt,0);
+    const days=Math.round((wEnd-d)/DAY),spend=Math.round(S.spend*days/7);
+    let avail=Math.max(0,inc-spend);const pays=[];
+    debts.forEach((db,j)=>{if(avail>0&&db.left>0){const p=Math.min(db.left,avail);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0})}});
+    const debt=pays.reduce((a,b)=>a+b.amt,0),save=avail;acc+=save;
+    const dLeft=debts.reduce((a,b)=>a+b.left,0);
+    PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save,dLeft,acc});w++;
   }
   T={inc:PLAN.reduce((a,b)=>a+b.inc,0),debt:PLAN.reduce((a,b)=>a+b.debt,0),save:acc,spend:PLAN.reduce((a,b)=>a+b.spend,0),
-     dLeft:debt,start,end,days:Math.round((end-start)/DAY)+1,freeDate:(PLAN.find(p=>p.dLeft===0&&p.debt>0)||{}).date};
+     debtTotal:S.debts.reduce((a,b)=>a+(+b.amt||0),0),dLeft:debts.reduce((a,b)=>a+b.left,0),start,end,days:Math.round((end-start)/DAY)+1,
+     freeDate:(PLAN.find(p=>p.dLeft===0&&p.debt>0)||{}).date,
+     bySrc:S.incomes.map((s,i)=>({name:s.name,tot:ev.filter(e=>e.src===i).reduce((a,b)=>a+b.amt,0)}))};
   render();
 }
 
 /* ---------- tasks ---------- */
 const taskId=(p,k)=>`w${p.w}_${k}`;
 function tasksFor(p){
-  const t=[{k:'inc',t:`Terima gaji minggu ${p.w}`,d:dlong(p.date),a:p.inc,c:'c-blue'}];
-  if(p.debt) t.push({k:'debt',t:p.dLeft===0?'Pelunasan utang (LUNAS!)':'Bayar cicilan utang',d:'Langsung di hari gajian',a:p.debt,c:'c-yellow'});
+  const t=p.evs.map((e,i)=>({k:'inc'+i+'_'+iso(e.date),t:e.name,d:dlong(e.date),a:e.amt,c:'c-blue'}));
+  p.pays.forEach(x=>t.push({k:'debt'+x.j,t:x.lunas?`${x.name} — PELUNASAN 🎉`:`Bayar ${x.name}`,d:'Langsung saat uang masuk',a:x.amt,c:'c-yellow'}));
   if(p.save) t.push({k:'save',t:'Setor ke tabungan terkunci',d:'Pindahkan, jangan disisakan',a:p.save,c:'c-green'});
   t.push({k:'prep',t:'Belanja food prep 1 minggu',d:'Beras · telur · bumbu',a:p.spend,c:'c-red'});
   return t;
@@ -333,12 +384,12 @@ function delLog(i){S.logs.splice(i,1);persist();render()}
 
 /* ---------- render ---------- */
 function render(){
+  if(!PLAN.length)return;
   const now=new Date(),cw=curWeek();
-  const doneDebt=PLAN.reduce((a,p)=>a+(S.done[taskId(p,'debt')]?p.debt:0),0);
+  const doneDebt=PLAN.reduce((a,p)=>a+p.pays.reduce((x,y)=>x+(S.done[taskId(p,'debt'+y.j)]?y.amt:0),0),0);
   const doneSave=PLAN.reduce((a,p)=>a+(S.done[taskId(p,'save')]?p.save:0),0);
-  const pD=T.debt?doneDebt/T.debt:1,pV=T.save?doneSave/T.save:0;
+  const pD=T.debtTotal?doneDebt/T.debtTotal:1,pV=T.save?doneSave/T.save:0;
 
-  /* hero */
   $('hEnd').textContent=dstr(T.end)+' '+T.end.getFullYear();
   $('hSave').textContent=fmt(T.save);
   const gap=T.save-S.target;
@@ -352,74 +403,91 @@ function render(){
   $('ringDebt').style.strokeDashoffset=352*(1-pD);$('ringPct').textContent=Math.round(pD*100)+'%';
   $('ringSave').style.strokeDashoffset=352*(1-pV);$('ringSavePct').textContent=Math.round(pV*100)+'%';
 
-  /* kpi */
-  $('kInc').textContent=fmt(T.inc);$('kIncS').textContent=`${PLAN.length}× gajian Senin · ${fmt(S.inc)}`;
-  $('kDebt').textContent=fmt(S.debt);$('kDebtS').textContent=`terbayar ${fmt(doneDebt)}`;
+  $('kInc').textContent=fmt(T.inc);$('kIncS').innerHTML=T.bySrc.map(s=>`${esc(s.name)} ${fmtK(s.tot)}`).join(' · ');
+  $('kDebt').textContent=fmt(T.debtTotal);$('kDebtS').textContent=`terbayar ${fmt(doneDebt)}`;
   $('kSave').textContent=fmt(T.save);$('kSaveS').textContent=`terkumpul ${fmt(doneSave)}`;
   $('kSpend').textContent=fmt(S.spend)+'/mg';$('kSpendS').textContent=`≈ ${fmt(S.spend/7)}/hari · total ${fmt(T.spend)}`;
   $('allocTot').textContent=fmt(T.inc);
-  const a=[T.debt,T.spend,T.save].map(x=>x/T.inc*100);
+  const a=[T.debt,T.spend,T.save].map(x=>T.inc?x/T.inc*100:0);
   $('bD').style.width=a[0]+'%';$('bS').style.width=a[1]+'%';$('bV').style.width=a[2]+'%';
   $('pD').textContent=a[0].toFixed(0)+'%';$('pS').textContent=a[1].toFixed(0)+'%';$('pV').textContent=a[2].toFixed(0)+'%';
 
-  /* week */
-  $('wTitle').textContent=`Minggu ${cw.w} · gajian ${dstr(cw.date)}`;
+  $('wTitle').textContent=`Minggu ${cw.w} · ${dstr(cw.date)} – ${dstr(new Date(cw.wEnd-DAY))}`;
   $('wTag').textContent=cw.debt?'FASE SERANG':'FASE BANGUN';$('wTag').className='tag '+(cw.debt?'y':'g');
-  $('wDesc').textContent=cw.debt?`Prioritas: bayar ${fmt(cw.debt)} ke utang di hari gajian. Sisa utang setelah ini ${fmt(cw.dLeft)}.`:`Utang sudah nol. Setor ${fmt(cw.save)} ke tabungan. Akumulasi setelah minggu ini ${fmt(cw.acc)}.`;
+  $('wDesc').textContent=cw.debt?`Masuk ${fmt(cw.inc)} dari ${cw.evs.length} sumber. Prioritas: bayar ${fmt(cw.debt)} ke utang. Sisa utang setelah ini ${fmt(cw.dLeft)}.`:`Masuk ${fmt(cw.inc)} dari ${cw.evs.length} sumber. Utang nol → setor ${fmt(cw.save)}. Akumulasi setelah minggu ini ${fmt(cw.acc)}.`;
   $('eDebt').textContent=fmt(cw.debt);$('eSave').textContent=fmt(cw.save);$('eSpend').textContent=fmt(cw.spend);
-  $('wTodo').innerHTML=tasksFor(cw).map(t=>{const id=taskId(cw,t.k);return `<div class="task ${S.done[id]?'done':''}" onclick="toggle('${id}')"><div class="chk">${S.done[id]?'✓':''}</div><div class="t">${t.t}<div class="d">${t.d}</div></div><div class="a ${t.c}">${fmt(t.a)}</div></div>`}).join('');
+  $('wTodo').innerHTML=tasksFor(cw).map(t=>{const id=taskId(cw,t.k);return `<div class="task ${S.done[id]?'done':''}" onclick="toggle('${id}')"><div class="chk">${S.done[id]?'✓':''}</div><div class="t">${esc(t.t)}<div class="d">${t.d}</div></div><div class="a ${t.c}">${fmt(t.a)}</div></div>`}).join('');
 
-  /* log */
   $('lgDate').textContent=dlong(now);
-  const wEnd=new Date(cw.date.getTime()+7*DAY);
-  const spentW=S.logs.filter(l=>{const d=new Date(l.d+'T00:00:00');return d>=cw.date&&d<wEnd}).reduce((a,b)=>a+b.a,0);
-  const left=S.spend-spentW,pct=Math.min(100,spentW/S.spend*100);
-  $('bgBar').style.width=pct+'%';$('bgBar').style.background=pct>100?'var(--red)':pct>75?'var(--yellow)':'var(--green)';
+  const spentW=S.logs.filter(l=>{const d=P(l.d);return d>=cw.date&&d<cw.wEnd}).reduce((a,b)=>a+b.a,0);
+  const left=cw.spend-spentW,pct=Math.min(100,cw.spend?spentW/cw.spend*100:100);
+  $('bgBar').style.width=pct+'%';$('bgBar').style.background=pct>=100?'var(--red)':pct>75?'var(--yellow)':'var(--green)';
   $('bgLeft').innerHTML=left>=0?`<span class="c-green">${fmt(left)}</span> <span class="mu">(${fmt(spentW)} terpakai)</span>`:`<span class="c-red">OVER ${fmt(-left)}</span> — potong minggu depan`;
-  $('lgList').innerHTML=S.logs.slice(0,30).map((l,i)=>`<div><span class="mu">${l.d.slice(5)} · ${l.n}</span><span>${fmt(l.a)}<button onclick="delLog(${i})">✕</button></span></div>`).join('')||'<div class="mu">Belum ada catatan hari ini.</div>';
+  $('lgList').innerHTML=S.logs.slice(0,30).map((l,i)=>`<div><span class="mu">${l.d.slice(5)} · ${esc(l.n)}</span><span>${fmt(l.a)}<button onclick="delLog(${i})">✕</button></span></div>`).join('')||'<div class="mu">Belum ada catatan.</div>';
 
-  /* timeline */
   $('tl').innerHTML=PLAN.map(p=>{
     const allDone=tasksFor(p).every(t=>S.done[taskId(p,t.k)]);
     const st=allDone?'<span class="tag g">SELESAI</span>':p===cw?'<span class="tag b">BERJALAN</span>':p.date<now?'<span class="tag y">TERLEWAT</span>':'<span class="tag" style="background:var(--card2);color:var(--mu)">NANTI</span>';
-    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}</td><td class="c-blue">${fmt(p.inc)}</td><td class="c-yellow">${p.debt?fmt(p.debt):'—'}</td><td class="c-red">${fmt(p.spend)}</td><td class="c-green">${p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
+    const srcs=p.evs.map(e=>`${esc(e.name)} ${fmtK(e.amt)} (${dstr(e.date)})`).join('\n');
+    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}</td><td class="c-blue" title="${srcs}">${fmt(p.inc)} <span class="mu" style="font-size:.65rem">(${p.evs.length}×)</span></td><td class="c-yellow">${p.debt?fmt(p.debt):'—'}</td><td class="c-red">${fmt(p.spend)}</td><td class="c-green">${p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
 
-  /* strategy text */
   const dw=PLAN.filter(p=>p.debt>0).length;
-  $('s1').textContent=`Seluruh sisa gaji setelah belanja (${fmt(S.inc-S.spend)}/minggu) dilempar ke utang. ${fmt(S.debt)} lunas dalam ${dw} minggu${T.freeDate?` — tanggal ${dstr(T.freeDate)}`:''}.`;
-  $('s2').textContent=`Mulai minggu ${dw+1}, ${fmt(S.inc-S.spend)}/minggu langsung disetor. ${PLAN.length-dw} setoran → ${fmt(T.save)}.`;
-  $('s3').textContent=`Amplop belanja ${fmt(S.spend)}/minggu = ${fmt(S.spend/7)}/hari. Ini mode bertahan hidup, bukan gaya hidup.`;
+  $('s1').textContent=`Semua uang masuk setelah jatah belanja dilempar ke utang. ${fmt(T.debtTotal)} lunas dalam ${dw} minggu${T.freeDate?` — tanggal ${dstr(T.freeDate)}`:''}.`;
+  $('s2').textContent=`Setelah lunas, setiap rupiah yang masuk (gaji + surplus) langsung disetor. ${PLAN.length-dw} minggu setoran → ${fmt(T.save)}.`;
+  $('s3').textContent=`Amplop belanja ${fmt(S.spend)}/minggu = ${fmt(S.spend/7)}/hari. Surplus pasangan BUKAN uang jajan — masuk pool yang sama.`;
   const per=Math.floor(S.spend/7/500)*500,rest=S.spend-per*7;
   $('dailyGrid').innerHTML=ID.slice(1).concat(ID[0]).map((d,i)=>`<div>${d}<b>${fmtK(per+(i===6?rest:0))}</b></div>`).join('');
 
-  drawChart(doneSave);
+  drawChart();
 }
 
 /* ---------- chart ---------- */
-function drawChart(doneSave){
-  const cv=$('cv'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=190;
+function drawChart(){
+  const cv=$('cv'),dpr=devicePixelRatio||1,W=cv.clientWidth,H=190;if(!W)return;
   cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);c.clearRect(0,0,W,H);
-  const pad={l:40,r:10,t:10,b:24},n=PLAN.length,max=Math.max(T.save,S.debt,1);
+  const pad={l:40,r:10,t:10,b:24},n=PLAN.length,max=Math.max(T.save,T.debtTotal,1);
   const x=i=>pad.l+(W-pad.l-pad.r)*i/Math.max(1,n),y=v=>H-pad.b-(H-pad.t-pad.b)*v/max;
   c.strokeStyle='#242834';c.fillStyle='#8b91a5';c.font='10px system-ui';c.textAlign='right';
   for(let g=0;g<=4;g++){const v=max*g/4;c.beginPath();c.moveTo(pad.l,y(v));c.lineTo(W-pad.r,y(v));c.stroke();c.fillText(fmtK(v),pad.l-6,y(v)+3)}
   c.textAlign='center';PLAN.forEach((p,i)=>c.fillText('M'+p.w,x(i+1),H-8));
   const line=(vals,col,fill)=>{c.beginPath();c.moveTo(x(0),y(vals[0]));vals.forEach((v,i)=>c.lineTo(x(i),y(v)));c.strokeStyle=col;c.lineWidth=2.5;c.stroke();
     if(fill){c.lineTo(x(vals.length-1),y(0));c.lineTo(x(0),y(0));c.closePath();c.fillStyle=fill;c.fill()}};
-  line([S.debt,...PLAN.map(p=>p.dLeft)],'#eab308');
+  line([T.debtTotal,...PLAN.map(p=>p.dLeft)],'#eab308');
   line([0,...PLAN.map(p=>p.acc)],'#22c55e','rgba(34,197,94,.10)');
-  let run=0;const real=[0,...PLAN.map(p=>run+= (S.done[taskId(p,'save')]?p.save:0))];
+  let run=0;const real=[0,...PLAN.map(p=>run+=(S.done[taskId(p,'save')]?p.save:0))];
   const lastDone=PLAN.reduce((m,p,i)=>S.done[taskId(p,'save')]?i+1:m,0);
   if(lastDone){line(real.slice(0,lastDone+1),'#3b82f6');c.beginPath();c.arc(x(lastDone),y(real[lastDone]),4,0,7);c.fillStyle='#3b82f6';c.fill()}
 }
 
 /* ---------- settings ---------- */
-function openSettings(){['inc','debt','spend','target','start','end'].forEach(k=>$('f'+k[0].toUpperCase()+k.slice(1)).value=S[k]);$('drawer').classList.add('open')}
+let F={};
+function renderLists(){
+  $('incList').innerHTML=F.incomes.map((s,i)=>`<div class="li">
+    <button class="x" onclick="F.incomes.splice(${i},1);renderLists()">✕</button>
+    <div class="full"><label>Nama</label><input value="${esc(s.name)}" oninput="F.incomes[${i}].name=this.value"></div>
+    <div><label>Nominal per pencairan (Rp)</label><input type="number" value="${s.amt}" oninput="F.incomes[${i}].amt=+this.value"></div>
+    <div><label>Setiap N hari (7=mingguan, 0=sekali)</label><input type="number" value="${s.every}" oninput="F.incomes[${i}].every=+this.value"></div>
+    <div><label>Mulai</label><input type="date" value="${s.start}" oninput="F.incomes[${i}].start=this.value"></div>
+    <div><label>Berakhir (opsional)</label><input type="date" value="${s.end||''}" oninput="F.incomes[${i}].end=this.value"></div>
+    <div class="full"><label>Maks total yang bisa diambil (opsional)</label><input type="number" value="${s.cap||''}" placeholder="mis. 300000" oninput="F.incomes[${i}].cap=this.value"></div>
+  </div>`).join('');
+  $('debtList').innerHTML=F.debts.map((d,i)=>`<div class="li">
+    <button class="x" onclick="F.debts.splice(${i},1);renderLists()">✕</button>
+    <div><label>Nama</label><input value="${esc(d.name)}" oninput="F.debts[${i}].name=this.value"></div>
+    <div><label>Nominal (Rp)</label><input type="number" value="${d.amt}" oninput="F.debts[${i}].amt=+this.value"></div>
+  </div>`).join('');
+}
+function addInc(){F.incomes.push({name:'Pemasukan baru',amt:0,every:7,start:F.start,end:'',cap:''});renderLists()}
+function addDebt(){F.debts.push({name:'Utang baru',amt:0});renderLists()}
+function openSettings(){F=JSON.parse(JSON.stringify({start:S.start,end:S.end,spend:S.spend,target:S.target,incomes:S.incomes,debts:S.debts}));
+  $('fStart').value=F.start;$('fEnd').value=F.end;$('fSpend').value=F.spend;$('fTarget').value=F.target;renderLists();$('drawer').classList.add('open')}
 function closeSettings(){$('drawer').classList.remove('open')}
-function saveSettings(){['inc','debt','spend','target'].forEach(k=>S[k]=+$('f'+k[0].toUpperCase()+k.slice(1)).value||0);S.start=$('fStart').value;S.end=$('fEnd').value;persist();build();closeSettings();toast('Rencana dihitung ulang')}
+function saveSettings(){
+  F.start=$('fStart').value;F.end=$('fEnd').value;F.spend=+$('fSpend').value||0;F.target=+$('fTarget').value||0;
+  if(!F.start||!F.end||P(F.end)<P(F.start))return toast('Tanggal tidak valid');
+  Object.assign(S,F);persist();build();closeSettings();toast('Rencana dihitung ulang')}
 function resetAll(){if(confirm('Hapus semua centang & catatan?')){S.done={};S.logs=[];persist();render()}}
 
-/* nav highlight */
 const links=[...document.querySelectorAll('.nav a')];
 addEventListener('scroll',()=>{let cur=links[0];links.forEach(l=>{const s=document.querySelector(l.getAttribute('href'));if(s&&s.getBoundingClientRect().top<160)cur=l});links.forEach(l=>l.classList.toggle('active',l===cur))});
 addEventListener('resize',()=>drawChart());
