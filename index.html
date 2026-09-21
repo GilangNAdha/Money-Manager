@@ -351,7 +351,7 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v14';
+const KEY='ledgr_v15';
 const DEF={
   start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
   incomes:[
@@ -360,7 +360,7 @@ const DEF={
     {name:'Surplus pasangan (Nov)',amt:50000,every:3,start:'2026-11-01',end:'2026-11-30',cap:300000},
     {name:'Uang project (kemungkinan)',amt:100000,every:0,start:'2026-09-23',end:'',cap:''}
   ],
-  debts:[{name:'Perbaikan motor',amt:150000,due:'2026-09-24',note:'Diganti dari surplus pasangan Okt'},{name:'Utang kecil',amt:16000,due:'2026-09-23',note:'Bayar Rabu dari uang project'},{name:'Utang utama',amt:523000,per:181000}],
+  debts:[{name:'Perbaikan motor',amt:150000,due:'2026-09-24',note:'Diganti dari surplus pasangan Okt'},{name:'Utang kecil',amt:16000,due:'2026-09-23',note:'Bayar Rabu dari uang project'},{name:'Utang utama',amt:523000,per:181000,fixed:true,note:'3 fase: 181k · 181k · 161k'}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -412,7 +412,12 @@ function build(){
       const p=db.left;db.left=0;reserved+=p;pays.push({j,name:db.name,amt:p,lunas:true,left:0,total:+db.amt||0,forced:true})});
     let avail=carry+inc-reserved-spend;carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);
     // 2) utang lainnya dari kas umum, berurutan
-    debts.forEach((db,j)=>{if(!(db.src===''||db.src==null))return;if(avail>0&&db.left>0&&inc>0){const p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0})}});
+    debts.forEach((db,j)=>{if(!(db.src===''||db.src==null)||db.due)return;if(!(db.left>0)||inc<=0)return;
+      let p;
+      const isPayday=evs.some(e=>(S.incomes[e.src]||{}).daily||+(S.incomes[e.src]||{}).every===7);
+      if(db.fixed&&+db.per>0){if(!isPayday)return;p=Math.min(db.left,+db.per);avail-=p;if(avail<0){carry+=avail;minCarry=Math.min(minCarry,carry);avail=0}}
+      else{if(avail<=0)return;p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);avail-=p}
+      db.left-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0,fixed:!!db.fixed})});
     const debt=pays.reduce((a,b)=>a+b.amt,0),save=avail;acc+=save;
     const dLeft=debts.reduce((a,b)=>a+b.left,0);
     PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save,dLeft,acc,days,carry});w++;d=wEnd;
@@ -564,7 +569,8 @@ function renderLists(){
     <div><label>Jatuh tempo (opsional, dibayar penuh minggu itu)</label><input type="date" value="${d.due||''}" oninput="F.debts[${i}].due=this.value"></div>
     <div><label>Catatan</label><input value="${esc(d.note||'')}" placeholder="mis. diganti surplus" oninput="F.debts[${i}].note=this.value"></div>
     <div class="full"><label>Sumber dana khusus (opsional)</label><select style="width:100%;background:#0a0b0f;border:1px solid var(--line);color:var(--tx);padding:8px 10px;border-radius:8px;font-size:.82rem" onchange="F.debts[${i}].src=this.value===''?'':+this.value"><option value="">Kas umum (gaji + semua pemasukan)</option>${F.incomes.map((s,k)=>`<option value="${k}" ${d.src===k?'selected':''}>Hanya dari: ${esc(s.name)}</option>`).join('')}</select></div>
-    <div class="full"><label>Maks bayar per gajian / cicilan (opsional, kosong = bayar semaksimal mungkin)</label><input type="number" value="${d.per||''}" placeholder="mis. 181000" oninput="F.debts[${i}].per=+this.value"></div>
+    <div class="full"><label>Cicilan per gajian (opsional, kosong = bayar semaksimal mungkin)</label><input type="number" value="${d.per||''}" placeholder="mis. 181000" oninput="F.debts[${i}].per=+this.value"></div>
+    <div class="full" style="display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--mu)"><input type="checkbox" style="width:auto" ${d.fixed?'checked':''} onchange="F.debts[${i}].fixed=this.checked"> Cicilan tetap — wajib dibayar penuh tiap gajian (kekurangan jadi talangan)</div>
   </div>`).join('');
 }
 function addInc(){F.incomes.push({name:'Pemasukan baru',amt:0,every:7,start:F.start,end:'',cap:''});renderLists()}
