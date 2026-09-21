@@ -209,6 +209,16 @@ tr.done td{color:var(--mu)}
     <div class="todo" id="wTodo"></div>
   </div>
 
+  <div class="card" style="margin-top:10px;border-color:rgba(244,63,94,.35)">
+    <div class="row" style="justify-content:space-between"><h3>Batas Belanja Hari Ini</h3><span class="tag" id="dTag"></span></div>
+    <div class="row" style="align-items:flex-end;gap:16px;margin-top:6px">
+      <div><div class="mu" style="font-size:.68rem">MAKS HARI INI</div><div style="font-size:2.2rem;font-weight:800;letter-spacing:-.03em" id="dMax">—</div></div>
+      <div style="flex:1"><div class="mu" style="font-size:.68rem">SISA HARI INI</div><div style="font-size:1.3rem;font-weight:800" id="dLeft">—</div></div>
+    </div>
+    <div class="budgetbar"><span id="dBar"></span></div>
+    <div class="mu" style="font-size:.72rem;margin-top:8px" id="dNote"></div>
+  </div>
+
   <div class="card" style="margin-top:10px">
     <div class="row" style="justify-content:space-between"><h3>Catat Pengeluaran Hari Ini</h3><span class="mu" style="font-size:.78rem" id="lgDate"></span></div>
     <div class="inp"><input id="lgAmt" type="number" inputmode="numeric" placeholder="Nominal, mis. 12000"><input id="lgNote" placeholder="Keterangan" style="flex:.8"><button class="btn" onclick="addLog()">＋</button></div>
@@ -436,6 +446,15 @@ function render(){
   const left=cw.spend-spentW,pct=Math.min(100,cw.spend?spentW/cw.spend*100:100);
   $('bgBar').style.width=pct+'%';$('bgBar').style.background=pct>=100?'var(--red)':pct>75?'var(--yellow)':'var(--green)';
   $('bgLeft').innerHTML=left>=0?`<span class="c-green">${fmt(left)}</span> <span class="mu">(${fmt(spentW)} terpakai)</span>`:`<span class="c-red">OVER ${fmt(-left)}</span> — potong minggu depan`;
+  /* daily cap: sisa amplop minggu dibagi rata ke hari yang tersisa (termasuk hari ini) */
+  const today=P(iso(now)),spentToday=S.logs.filter(l=>l.d===iso(now)).reduce((a,b)=>a+b.a,0);
+  const spentBefore=spentW-spentToday,daysLeftW=Math.max(1,Math.round((cw.wEnd-today)/DAY));
+  const dMax=Math.max(0,Math.floor((cw.spend-spentBefore)/daysLeftW/500)*500),dLeft=dMax-spentToday,dp=dMax?Math.min(100,spentToday/dMax*100):100;
+  $('dMax').textContent=fmt(dMax);$('dMax').className=dLeft<0?'c-red':'';
+  $('dLeft').innerHTML=dLeft>=0?`<span class="c-green">${fmt(dLeft)}</span>`:`<span class="c-red">OVER ${fmt(-dLeft)}</span>`;
+  $('dBar').style.width=dp+'%';$('dBar').style.background=dp>=100?'var(--red)':dp>75?'var(--yellow)':'var(--green)';
+  $('dTag').textContent=daysLeftW+' hari tersisa';$('dTag').className='tag b';
+  $('dNote').textContent=`Jatah dasar ${fmt(S.spend/7)}/hari. Angka di atas = sisa amplop minggu (${fmt(Math.max(0,cw.spend-spentBefore))}) ÷ ${daysLeftW} hari — hemat hari ini, longgar besok.`;
   $('lgList').innerHTML=S.logs.slice(0,30).map((l,i)=>`<div><span class="mu">${l.d.slice(5)} · ${esc(l.n)}</span><span>${fmt(l.a)}<button onclick="delLog(${i})">✕</button></span></div>`).join('')||'<div class="mu">Belum ada catatan.</div>';
 
   $('tl').innerHTML=PLAN.map(p=>{
