@@ -351,7 +351,7 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v12';
+const KEY='ledgr_v13';
 const DEF={
   start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
   incomes:[
@@ -360,7 +360,7 @@ const DEF={
     {name:'Surplus pasangan (Nov)',amt:50000,every:3,start:'2026-11-01',end:'2026-11-30',cap:300000},
     {name:'Uang project (kemungkinan)',amt:100000,every:0,start:'2026-09-23',end:'',cap:''}
   ],
-  debts:[{name:'Perbaikan motor',amt:150000,src:1},{name:'Utang kecil',amt:16000},{name:'Utang utama',amt:523000,per:181000}],
+  debts:[{name:'Perbaikan motor',amt:150000,due:'2026-09-24',note:'Diganti dari surplus pasangan Okt'},{name:'Utang kecil',amt:16000},{name:'Utang utama',amt:523000,per:181000}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -407,6 +407,9 @@ function build(){
       const bySrc=evs.filter(e=>e.src===+db.src).reduce((a,b)=>a+b.amt,0);
       const p=Math.min(db.left,bySrc,+db.per>0?+db.per:Infinity);if(p<=0)return;
       db.left-=p;reserved+=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0,srcName:(S.incomes[+db.src]||{}).name})});
+    // 1b) utang dengan jatuh tempo di minggu ini: WAJIB dibayar penuh (boleh talangan)
+    debts.forEach((db,j)=>{if(!db.due||!(db.left>0))return;const dd=P(db.due);const hit=(dd>=d&&dd<wEnd)||(dd<d&&w===1);if(!hit)return;
+      const p=db.left;db.left=0;reserved+=p;pays.push({j,name:db.name,amt:p,lunas:true,left:0,total:+db.amt||0,forced:true})});
     let avail=carry+inc-reserved-spend;carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);
     // 2) utang lainnya dari kas umum, berurutan
     debts.forEach((db,j)=>{if(!(db.src===''||db.src==null))return;if(avail>0&&db.left>0&&inc>0){const p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0})}});
@@ -451,7 +454,7 @@ function render(){
   $('hSub').innerHTML=T.dLeft>0?`⚠️ Utang belum bisa lunas: sisa ${fmt(T.dLeft)}. Turunkan belanja atau tambah pemasukan.`:
     gap>=0?`✅ Melampaui target ${fmt(S.target)} sebesar <b class="c-green">${fmt(gap)}</b> · bebas utang dalam ${PLAN.filter(p=>p.debt>0).length} minggu`:
     `⚠️ Kurang <b class="c-red">${fmt(-gap)}</b> dari target ${fmt(S.target)}. Butuh tambahan ${fmt(-gap/PLAN.length)}/minggu.`;
-  if(T.minCarry<0)$('hSub').innerHTML+=`<br>🟡 Minggu awal belum ada pemasukan: butuh talangan <b class="c-yellow">${fmt(-T.minCarry)}</b> untuk makan sampai gajian pertama (dipotong otomatis dari gajian berikutnya).`;
+  if(T.minCarry<0)$('hSub').innerHTML+=`<br>🟡 Ada minggu defisit: butuh talangan <b class="c-yellow">${fmt(-T.minCarry)}</b> (mis. pinjam sementara dari pasangan / bayar motor bertahap) — otomatis dipotong dari pemasukan berikutnya.`;
   const dayNo=Math.floor((now-T.start)/DAY)+1;
   $('hDay').textContent=Math.min(T.days,Math.max(0,dayNo))+' / '+T.days;
   $('hLeft').textContent=Math.max(0,Math.ceil((T.end-now)/DAY));
@@ -503,7 +506,7 @@ function render(){
     const tot=+d.amt||0,pct=tot?paid/tot*100:0,planned=sched.reduce((a,s)=>a+s.x.amt,0);
     const lunasDate=(sched.find(s=>s.x.lunas)||{}).p;
     return `<div class="card dc">
-      <div class="hd"><div><b>${esc(d.name)}</b><div class="mu" style="font-size:.72rem">${d.src!==''&&d.src!=null&&S.incomes[d.src]?`💠 Dicover: ${esc(S.incomes[d.src].name)} · `:''}${d.per?`Cicilan maks ${fmt(d.per)}/gajian · `:''}${sched.length}× bayar${lunasDate?` · lunas ${dstr(lunasDate.date)}`:''}</div></div>
+      <div class="hd"><div><b>${esc(d.name)}</b><div class="mu" style="font-size:.72rem">${d.due?`⏰ Jatuh tempo ${dstr(P(d.due))} · `:''}${d.note?`💠 ${esc(d.note)} · `:''}${d.src!==''&&d.src!=null&&S.incomes[d.src]?`💠 Dicover: ${esc(S.incomes[d.src].name)} · `:''}${d.per?`Cicilan maks ${fmt(d.per)}/gajian · `:''}${sched.length}× bayar${lunasDate?` · lunas ${dstr(lunasDate.date)}`:''}</div></div>
       <span class="tag ${paid>=tot&&tot?'g':'y'}">${paid>=tot&&tot?'LUNAS':Math.round(pct)+'%'}</span></div>
       <div class="row" style="justify-content:space-between;margin-top:8px"><span class="amt c-yellow">${fmt(tot)}</span><span class="mu" style="font-size:.75rem">terbayar <b class="c-green">${fmt(paid)}</b></span></div>
       <div class="mini"><span style="width:${pct}%"></span></div>
@@ -558,6 +561,8 @@ function renderLists(){
     <button class="x" onclick="F.debts.splice(${i},1);renderLists()">✕</button>
     <div><label>Nama</label><input value="${esc(d.name)}" oninput="F.debts[${i}].name=this.value"></div>
     <div><label>Nominal (Rp)</label><input type="number" value="${d.amt}" oninput="F.debts[${i}].amt=+this.value"></div>
+    <div><label>Jatuh tempo (opsional, dibayar penuh minggu itu)</label><input type="date" value="${d.due||''}" oninput="F.debts[${i}].due=this.value"></div>
+    <div><label>Catatan</label><input value="${esc(d.note||'')}" placeholder="mis. diganti surplus" oninput="F.debts[${i}].note=this.value"></div>
     <div class="full"><label>Sumber dana khusus (opsional)</label><select style="width:100%;background:#0a0b0f;border:1px solid var(--line);color:var(--tx);padding:8px 10px;border-radius:8px;font-size:.82rem" onchange="F.debts[${i}].src=this.value===''?'':+this.value"><option value="">Kas umum (gaji + semua pemasukan)</option>${F.incomes.map((s,k)=>`<option value="${k}" ${d.src===k?'selected':''}>Hanya dari: ${esc(s.name)}</option>`).join('')}</select></div>
     <div class="full"><label>Maks bayar per gajian / cicilan (opsional, kosong = bayar semaksimal mungkin)</label><input type="number" value="${d.per||''}" placeholder="mis. 181000" oninput="F.debts[${i}].per=+this.value"></div>
   </div>`).join('');
