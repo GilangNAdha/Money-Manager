@@ -315,14 +315,14 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v4';
+const KEY='ledgr_v5';
 const DEF={
-  start:'2026-09-23',end:'2026-10-31',spend:40000,target:1000000,payday:1,
+  start:'2026-09-22',end:'2026-10-31',spend:40000,target:1000000,payday:1,
   incomes:[
     {name:'Gaji harian (dibayar Senin)',amt:50000,every:7,start:'2026-09-28',end:'',cap:'',daily:true},
     {name:'Surplus pasangan',amt:50000,every:3,start:'2026-10-01',end:'2026-10-31',cap:300000}
   ],
-  debts:[{name:'Utang',amt:523000}],
+  debts:[{name:'Perbaikan motor (dicover surplus pasangan)',amt:150000},{name:'Utang',amt:523000}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
