@@ -411,17 +411,19 @@ function build(){
     // 1b) utang dengan jatuh tempo di minggu ini: WAJIB dibayar penuh (boleh talangan)
     debts.forEach((db,j)=>{if(!db.due||!(db.left>0))return;const dd=P(db.due);const hit=(dd>=d&&dd<wEnd)||(dd<d&&w===1);if(!hit)return;
       const p=db.left;db.left=0;reserved+=p;pays.push({j,name:db.name,amt:p,lunas:true,left:0,total:+db.amt||0,forced:true})});
-    let avail=carry+inc-reserved-spend;carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);
+    let avail=carry+inc-reserved-spend,drawn=0;
+    if(avail<0&&acc>0){drawn=Math.min(-avail,acc);acc-=drawn;avail+=drawn}
+    carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);
     // 2) utang lainnya dari kas umum, berurutan
     debts.forEach((db,j)=>{if(!(db.src===''||db.src==null)||db.due)return;if(!(db.left>0)||inc<=0)return;
       let p;
       const isPayday=evs.some(e=>(S.incomes[e.src]||{}).daily||+(S.incomes[e.src]||{}).every===7);
-      if(db.fixed&&+db.per>0){if(!isPayday)return;p=Math.min(db.left,+db.per);avail-=p;if(avail<0){carry+=avail;minCarry=Math.min(minCarry,carry);avail=0}}
+      if(db.fixed&&+db.per>0){if(!isPayday)return;p=Math.min(db.left,+db.per);avail-=p;if(avail<0&&acc>0){const dr=Math.min(-avail,acc);acc-=dr;avail+=dr;drawn+=dr}if(avail<0){carry+=avail;minCarry=Math.min(minCarry,carry);avail=0}}
       else{if(avail<=0)return;p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);avail-=p}
       db.left-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0,fixed:!!db.fixed})});
     const debt=pays.reduce((a,b)=>a+b.amt,0),save=avail;acc+=save;
     const dLeft=debts.reduce((a,b)=>a+b.left,0);
-    PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save,dLeft,acc,days,carry});w++;d=wEnd;
+    PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save:save-drawn,drawn,dLeft,acc,days,carry});w++;d=wEnd;
   }
   T={inc:PLAN.reduce((a,b)=>a+b.inc,0),debt:PLAN.reduce((a,b)=>a+b.debt,0),save:acc,spend:PLAN.reduce((a,b)=>a+b.spend,0),
      debtTotal:S.debts.reduce((a,b)=>a+(+b.amt||0),0),dLeft:debts.reduce((a,b)=>a+b.left,0),start,end,days:Math.round((end-start)/DAY)+1,
@@ -503,7 +505,7 @@ function render(){
     const allDone=tasksFor(p).every(t=>S.done[taskId(p,t.k)]);
     const st=allDone?'<span class="tag g">SELESAI</span>':p===cw?'<span class="tag b">BERJALAN</span>':p.date<now?'<span class="tag y">TERLEWAT</span>':'<span class="tag" style="background:var(--card2);color:var(--mu)">NANTI</span>';
     const srcs=p.evs.map(e=>`${esc(e.name)} ${fmtK(e.amt)} (${dstr(e.date)})`).join('\n');
-    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}–${dstr(new Date(p.wEnd-DAY))}</td><td class="c-blue" title="${srcs}">${fmt(p.inc)} <span class="mu" style="font-size:.65rem">(${p.evs.length}×)</span></td><td class="c-yellow">${p.debt?fmt(p.debt)+'<div class="mu" style="font-size:.62rem;white-space:normal;max-width:180px">'+p.pays.map(x=>esc(x.name.split(' (')[0])+' '+fmtK(x.amt)+(x.lunas?' ✓':'')).join(' · ')+'</div>':'—'}</td><td class="c-red">${fmt(p.spend)}${p.carry<0?` <span class="tag y">talangan ${fmtK(-p.carry)}</span>`:''}</td><td class="c-green">${p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
+    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}–${dstr(new Date(p.wEnd-DAY))}</td><td class="c-blue" title="${srcs}">${fmt(p.inc)} <span class="mu" style="font-size:.65rem">(${p.evs.length}×)</span></td><td class="c-yellow">${p.debt?fmt(p.debt)+'<div class="mu" style="font-size:.62rem;white-space:normal;max-width:180px">'+p.pays.map(x=>esc(x.name.split(' (')[0])+' '+fmtK(x.amt)+(x.lunas?' ✓':'')).join(' · ')+'</div>':'—'}</td><td class="c-red">${fmt(p.spend)}${p.carry<0?` <span class="tag y">talangan ${fmtK(-p.carry)}</span>`:''}</td><td class="c-green">${p.drawn?`<span class="c-red">−${fmt(p.drawn)}</span><div class="mu" style="font-size:.62rem">ambil dari tabungan</div>`:p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
 
   /* debt cards */
   $('debtCards').innerHTML=S.debts.map((d,j)=>{
