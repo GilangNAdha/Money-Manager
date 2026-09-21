@@ -246,6 +246,31 @@ tr.done td{color:var(--mu)}
   </table></div>
 </section>
 
+<!-- DEBTS -->
+<section id="debts">
+  <h2>Jadwal pelunasan per utang</h2>
+  <p class="mu" style="font-size:.78rem;margin:-4px 0 12px">Setiap utang punya kartu & jadwal sendiri. Centang saat sudah dibayar — tidak ada yang tercampur.</p>
+  <div class="debtgrid" id="debtCards"></div>
+</section>
+<style>
+.debtgrid{display:grid;gap:10px}
+@media(min-width:760px){.debtgrid{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}}
+.dc .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.dc .hd b{font-size:1rem}
+.dc .amt{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.dc .mini{height:6px;border-radius:999px;background:#0a0b0f;overflow:hidden;margin:10px 0}
+.dc .mini span{display:block;height:100%;background:var(--yellow);transition:.4s}
+.pay{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:var(--card2);margin-top:6px;cursor:pointer;border:1px solid transparent}
+.pay:hover{border-color:var(--yellow)}
+.pay .chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--mu);display:grid;place-items:center;font-size:12px;flex-shrink:0}
+.pay.done{background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.35)}
+.pay.done .chk{background:var(--green);border-color:var(--green);color:#052e16}
+.pay .i{flex:1;font-size:.8rem}.pay .i small{display:block;color:var(--mu);font-size:.68rem}
+.pay .v{font-weight:800;font-size:.85rem}
+.pay .rem{font-size:.65rem;color:var(--mu);text-align:right}
+.src span.y{background:rgba(234,179,8,.12)}
+</style>
+
 <!-- STRATEGY -->
 <section id="strategy">
   <h2>Playbook strategi</h2>
@@ -307,6 +332,7 @@ tr.done td{color:var(--mu)}
   <a href="#overview" class="active"><span>▦</span>Ringkasan</a>
   <a href="#week"><span>◎</span>Minggu ini</a>
   <a href="#timeline"><span>▤</span>Timeline</a>
+  <a href="#debts"><span>◔</span>Utang</a>
   <a href="#strategy"><span>⚑</span>Strategi</a>
 </div></div>
 <div class="toast" id="toast"></div>
@@ -325,7 +351,7 @@ const toast=m=>{const t=$('toast');t.textContent=m;t.classList.add('show');setTi
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- state ---------- */
-const KEY='ledgr_v9';
+const KEY='ledgr_v10';
 const DEF={
   start:'2026-09-22',end:'2026-11-10',spend:100000,target:1000000,payday:1,
   incomes:[
@@ -334,7 +360,7 @@ const DEF={
     {name:'Surplus pasangan (Nov)',amt:50000,every:3,start:'2026-11-01',end:'2026-11-30',cap:300000},
     {name:'Uang project (kemungkinan)',amt:100000,every:0,start:'2026-09-23',end:'',cap:''}
   ],
-  debts:[{name:'Utang kecil',amt:16000},{name:'Perbaikan motor (dicover surplus pasangan)',amt:150000},{name:'Utang (cicil 181k/gajian)',amt:523000,per:181000}],
+  debts:[{name:'Utang kecil',amt:16000},{name:'Perbaikan motor',amt:150000},{name:'Utang utama',amt:523000,per:181000}],
   done:{},logs:[]
 };
 let S=Object.assign({},JSON.parse(JSON.stringify(DEF)),JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -376,7 +402,7 @@ function build(){
     const inc=evs.reduce((a,b)=>a+b.amt,0);
     const days=Math.round((wEnd-d)/DAY),spend=Math.round(S.spend*days/7);
     let avail=carry+inc-spend;carry=Math.min(0,avail);minCarry=Math.min(minCarry,carry);avail=Math.max(0,avail);const pays=[];
-    debts.forEach((db,j)=>{if(avail>0&&db.left>0&&inc>0){const p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0})}});
+    debts.forEach((db,j)=>{if(avail>0&&db.left>0&&inc>0){const p=Math.min(db.left,avail,+db.per>0?+db.per:Infinity);db.left-=p;avail-=p;pays.push({j,name:db.name,amt:p,lunas:db.left===0,left:db.left,total:+db.amt||0})}});
     const debt=pays.reduce((a,b)=>a+b.amt,0),save=avail;acc+=save;
     const dLeft=debts.reduce((a,b)=>a+b.left,0);
     PLAN.push({w,date:new Date(d),wEnd,evs,inc,debt,pays,spend,save,dLeft,acc,days,carry});w++;d=wEnd;
@@ -392,7 +418,7 @@ function build(){
 const taskId=(p,k)=>`w${p.w}_${k}`;
 function tasksFor(p){
   const t=p.evs.map((e,i)=>({k:'inc'+i+'_'+iso(e.date),t:e.name,d:dlong(e.date),a:e.amt,c:'c-blue'}));
-  p.pays.forEach(x=>t.push({k:'debt'+x.j,t:x.lunas?`${x.name} — PELUNASAN 🎉`:`Bayar ${x.name}`,d:'Langsung saat uang masuk',a:x.amt,c:'c-yellow'}));
+  p.pays.forEach(x=>t.push({k:'debt'+x.j,t:x.lunas?`${x.name} — PELUNASAN 🎉`:`Bayar ${x.name}`,d:`Sisa setelah bayar: ${fmt(x.left)} dari ${fmt(x.total)}`,a:x.amt,c:'c-yellow'}));
   if(p.save) t.push({k:'save',t:'Setor ke tabungan terkunci',d:'Pindahkan, jangan disisakan',a:p.save,c:'c-green'});
   t.push({k:'prep',t:'Belanja food prep 1 minggu',d:'Beras · telur · bumbu',a:p.spend,c:'c-red'});
   return t;
@@ -438,7 +464,7 @@ function render(){
   $('wTitle').textContent=`Minggu ${cw.w} · ${dstr(cw.date)} – ${dstr(new Date(cw.wEnd-DAY))}`;
   $('wTag').textContent=!cw.inc?'FASE BERTAHAN':cw.debt?'FASE SERANG':'FASE BANGUN';$('wTag').className='tag '+(!cw.inc?'b':cw.debt?'y':'g');
   $('wDesc').textContent=!cw.inc?`Belum ada pemasukan minggu ini (${cw.days} hari kerja). Bertahan dengan ${fmt(cw.spend)} — talangan ini dipotong dari gajian ${dstr(cw.wEnd)}.`:cw.debt?`Masuk ${fmt(cw.inc)} dari ${cw.evs.length} sumber. Prioritas: bayar ${fmt(cw.debt)} ke utang. Sisa utang setelah ini ${fmt(cw.dLeft)}.`:`Masuk ${fmt(cw.inc)} dari ${cw.evs.length} sumber. Utang nol → setor ${fmt(cw.save)}. Akumulasi setelah minggu ini ${fmt(cw.acc)}.`;
-  $('eDebt').textContent=fmt(cw.debt);$('eSave').textContent=fmt(cw.save);$('eSpend').textContent=fmt(cw.spend);
+  $('eDebt').innerHTML=fmt(cw.debt)+(cw.pays.length>1?`<div class="mu" style="font-size:.6rem;font-weight:400">${cw.pays.map(x=>esc(x.name.split(' (')[0])+' '+fmtK(x.amt)).join(' + ')}</div>`:'');$('eSave').textContent=fmt(cw.save);$('eSpend').textContent=fmt(cw.spend);
   $('wTodo').innerHTML=tasksFor(cw).map(t=>{const id=taskId(cw,t.k);return `<div class="task ${S.done[id]?'done':''}" onclick="toggle('${id}')"><div class="chk">${S.done[id]?'✓':''}</div><div class="t">${esc(t.t)}<div class="d">${t.d}</div></div><div class="a ${t.c}">${fmt(t.a)}</div></div>`}).join('');
 
   $('lgDate').textContent=dlong(now);
@@ -461,7 +487,24 @@ function render(){
     const allDone=tasksFor(p).every(t=>S.done[taskId(p,t.k)]);
     const st=allDone?'<span class="tag g">SELESAI</span>':p===cw?'<span class="tag b">BERJALAN</span>':p.date<now?'<span class="tag y">TERLEWAT</span>':'<span class="tag" style="background:var(--card2);color:var(--mu)">NANTI</span>';
     const srcs=p.evs.map(e=>`${esc(e.name)} ${fmtK(e.amt)} (${dstr(e.date)})`).join('\n');
-    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}–${dstr(new Date(p.wEnd-DAY))}</td><td class="c-blue" title="${srcs}">${fmt(p.inc)} <span class="mu" style="font-size:.65rem">(${p.evs.length}×)</span></td><td class="c-yellow">${p.debt?fmt(p.debt):'—'}</td><td class="c-red">${fmt(p.spend)}${p.carry<0?` <span class="tag y">talangan ${fmtK(-p.carry)}</span>`:''}</td><td class="c-green">${p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
+    return `<tr class="${allDone?'done':''} ${p===cw?'now':''}"><td>${p.w}</td><td>${dstr(p.date)}–${dstr(new Date(p.wEnd-DAY))}</td><td class="c-blue" title="${srcs}">${fmt(p.inc)} <span class="mu" style="font-size:.65rem">(${p.evs.length}×)</span></td><td class="c-yellow">${p.debt?fmt(p.debt)+'<div class="mu" style="font-size:.62rem;white-space:normal;max-width:180px">'+p.pays.map(x=>esc(x.name.split(' (')[0])+' '+fmtK(x.amt)+(x.lunas?' ✓':'')).join(' · ')+'</div>':'—'}</td><td class="c-red">${fmt(p.spend)}${p.carry<0?` <span class="tag y">talangan ${fmtK(-p.carry)}</span>`:''}</td><td class="c-green">${p.save?fmt(p.save):'—'}</td><td>${p.dLeft?fmt(p.dLeft):'<b class="c-green">LUNAS</b>'}</td><td><b>${fmt(p.acc)}</b></td><td>${st}</td></tr>`}).join('');
+
+  /* debt cards */
+  $('debtCards').innerHTML=S.debts.map((d,j)=>{
+    const sched=[];PLAN.forEach(p=>p.pays.filter(x=>x.j===j).forEach(x=>sched.push({p,x})));
+    const paid=sched.filter(s=>S.done[taskId(s.p,'debt'+j)]).reduce((a,s)=>a+s.x.amt,0);
+    const tot=+d.amt||0,pct=tot?paid/tot*100:0,planned=sched.reduce((a,s)=>a+s.x.amt,0);
+    const lunasDate=(sched.find(s=>s.x.lunas)||{}).p;
+    return `<div class="card dc">
+      <div class="hd"><div><b>${esc(d.name)}</b><div class="mu" style="font-size:.72rem">${d.per?`Cicilan maks ${fmt(d.per)}/gajian · `:''}${sched.length}× bayar${lunasDate?` · lunas ${dstr(lunasDate.date)}`:''}</div></div>
+      <span class="tag ${paid>=tot&&tot?'g':'y'}">${paid>=tot&&tot?'LUNAS':Math.round(pct)+'%'}</span></div>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="amt c-yellow">${fmt(tot)}</span><span class="mu" style="font-size:.75rem">terbayar <b class="c-green">${fmt(paid)}</b></span></div>
+      <div class="mini"><span style="width:${pct}%"></span></div>
+      ${planned<tot?`<div class="mu" style="font-size:.72rem;color:var(--red)">⚠ Rencana hanya menutup ${fmt(planned)} — kurang ${fmt(tot-planned)} sampai deadline.</div>`:''}
+      ${sched.map((s,i)=>{const id=taskId(s.p,'debt'+j);return `<div class="pay ${S.done[id]?'done':''}" onclick="toggle('${id}')"><div class="chk">${S.done[id]?'✓':''}</div>
+        <div class="i">Bayar ke-${i+1}${s.x.lunas?' · <b class="c-green">PELUNASAN</b>':''}<small>Gajian ${dstr(s.p.date)} · minggu ${s.p.w}</small></div>
+        <div><div class="v c-yellow">${fmt(s.x.amt)}</div><div class="rem">sisa ${fmt(s.x.left)}</div></div></div>`}).join('')||'<div class="mu" style="font-size:.75rem;margin-top:8px">Tidak ada pembayaran terjadwal.</div>'}
+    </div>`}).join('');
 
   const dw=PLAN.filter(p=>p.debt>0).length;
   $('s1').textContent=`Mulai kerja ${dstr(T.start)}; gajian pertama ${PLAN.find(p=>p.inc)?dstr(PLAN.find(p=>p.inc).evs[0].date):'-'}. Semua uang masuk setelah jatah belanja dilempar ke utang. ${fmt(T.debtTotal)} lunas dalam ${dw} minggu${T.freeDate?` — tanggal ${dstr(T.freeDate)}`:''}.`;
